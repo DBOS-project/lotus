@@ -1,5 +1,5 @@
 # Overview
-This repository contains source code for Lotus. The code is based on the [star](https://github.com/luyi0619/star) from Yi Lu.
+This repository contains source code for Lotus. The code is based on [star](https://github.com/luyi0619/star) framework from Yi Lu.
 
 # Dependencies
 
