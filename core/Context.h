@@ -81,13 +81,16 @@ public:
 
   std::vector<std::string> peers;
   int stragglers_per_batch = 0;
-  int stragglers_total_wait_time = 5000;
+  int stragglers_total_wait_time = 20000;
   int stragglers_partition = -1;
   int sender_group_nop_count = 40000;
   double straggler_zipf_factor = 0;
   std::size_t straggler_num_txn_len = 10;
   std::size_t granules_per_partition = 128;
   bool lotus_async_repl = false;
+  int lotus_checkpoint = 0;
+  std::string lotus_checkpoint_location;
   bool hstore_active_active = false;
+  bool lotus_sp_parallel_exec_commit = false;
 };
 } // namespace star

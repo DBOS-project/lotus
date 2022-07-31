@@ -16,6 +16,8 @@
 #include "benchmark/tpcc/Random.h"
 #include "benchmark/tpcc/Schema.h"
 #include "common/Operation.h"
+#include "common/ThreadPool.h"
+#include "common/WALLogger.h"
 #include "common/Time.h"
 #include "core/Partitioner.h"
 #include "core/Table.h"
@@ -123,7 +125,12 @@ public:
   }
 
   void initialize(const Context &context) {
-
+    if (context.lotus_checkpoint) {
+      for (int i = 0; i < 6; ++i) {
+        threadpools.push_back(new ThreadPool(1));
+      }
+      checkpoint_file_writer = new SimpleWALLogger(context.lotus_checkpoint_location);
+    }
     std::size_t coordinator_id = context.coordinator_id;
     std::size_t partitionNum = context.partition_num;
     std::size_t threadsNum = context.worker_num;
@@ -137,112 +144,200 @@ public:
 
     for (auto partitionID = 0u; partitionID < partitionNum; partitionID++) {
       auto warehouseTableID = warehouse::tableID;
-      if (context.protocol != "HStore") {
+      if (context.protocol == "Sundial"){
+        tbl_warehouse_vec.push_back(
+          std::make_unique<Table<997, warehouse::key, warehouse::value, MetaInitFuncSundial>>(
+              warehouseTableID, partitionID));
+      } else if (context.protocol != "HStore") {
         tbl_warehouse_vec.push_back(
           std::make_unique<Table<997, warehouse::key, warehouse::value>>(
-              warehouseTableID, partitionID));
+            warehouseTableID, partitionID));
       } else {
-        tbl_warehouse_vec.push_back(
+        if (context.lotus_checkpoint) {
+          tbl_warehouse_vec.push_back(
+          std::make_unique<HStoreCOWTable<997, warehouse::key, warehouse::value>>(
+              warehouseTableID, partitionID));
+        } else {
+          tbl_warehouse_vec.push_back(
           std::make_unique<HStoreTable<warehouse::key, warehouse::value>>(
               warehouseTableID, partitionID));
+        }
       }
       
       auto districtTableID = district::tableID;
-      if (context.protocol != "HStore") {
+      if (context.protocol == "Sundial"){
+        tbl_district_vec.push_back(
+          std::make_unique<Table<997, district::key, district::value, MetaInitFuncSundial>>(
+              districtTableID, partitionID));
+      } else if (context.protocol != "HStore") {
         tbl_district_vec.push_back(
           std::make_unique<Table<997, district::key, district::value>>(
               districtTableID, partitionID));
       } else {
-        tbl_district_vec.push_back(
-          std::make_unique<HStoreTable<district::key, district::value>>(
+        if (context.lotus_checkpoint) {
+          tbl_district_vec.push_back(
+            std::make_unique<HStoreCOWTable<997, district::key, district::value>>(
               districtTableID, partitionID));
+        } else {
+          tbl_district_vec.push_back(
+            std::make_unique<HStoreTable<district::key, district::value>>(
+              districtTableID, partitionID));
+        }
       }
 
       auto customerTableID = customer::tableID;
-      if (context.protocol != "HStore") {
+      if (context.protocol == "Sundial"){
+        tbl_customer_vec.push_back(
+            std::make_unique<Table<997, customer::key, customer::value, MetaInitFuncSundial>>(
+                customerTableID, partitionID));
+      } else if (context.protocol != "HStore") {
         tbl_customer_vec.push_back(
             std::make_unique<Table<997, customer::key, customer::value>>(
                 customerTableID, partitionID));
       } else {
-        tbl_customer_vec.push_back(
+        if (context.lotus_checkpoint) {
+          tbl_customer_vec.push_back(
+            std::make_unique<HStoreCOWTable<997, customer::key, customer::value>>(
+                customerTableID, partitionID));
+        } else {
+          tbl_customer_vec.push_back(
             std::make_unique<HStoreTable<customer::key, customer::value>>(
                 customerTableID, partitionID));
+        }
       }
 
       auto customerNameIdxTableID = customer_name_idx::tableID;
-      //if (context.protocol != "HStore") {
+      if (context.protocol == "Sundial"){
+        tbl_customer_name_idx_vec.push_back(
+          std::make_unique<
+              Table<997, customer_name_idx::key, customer_name_idx::value, MetaInitFuncSundial>>(
+              customerNameIdxTableID, partitionID));
+      } else {
         tbl_customer_name_idx_vec.push_back(
           std::make_unique<
               Table<997, customer_name_idx::key, customer_name_idx::value>>(
               customerNameIdxTableID, partitionID));
-      // } else {
-      //   tbl_customer_name_idx_vec.push_back(
-      //     std::make_unique<
-      //         HStoreTable<customer_name_idx::key, customer_name_idx::value>>(
-      //         customerNameIdxTableID, partitionID));
-      // }
+      }
 
       auto historyTableID = history::tableID;
-      if (context.protocol != "HStore") {
+      if (context.protocol == "Sundial"){
+        tbl_history_vec.push_back(
+          std::make_unique<Table<997, history::key, history::value, MetaInitFuncSundial>>(
+              historyTableID, partitionID));
+      } else if (context.protocol != "HStore") {
         tbl_history_vec.push_back(
           std::make_unique<Table<997, history::key, history::value>>(
               historyTableID, partitionID));
       } else {
-        tbl_history_vec.push_back(
+        if (context.lotus_checkpoint) {
+          tbl_history_vec.push_back(
+            std::make_unique<HStoreCOWTable<997, history::key, history::value>>(
+              historyTableID, partitionID));
+        } else {
+          tbl_history_vec.push_back(
           std::make_unique<HStoreTable<history::key, history::value>>(
               historyTableID, partitionID));
+        }
       }
 
       auto newOrderTableID = new_order::tableID;
-      if (context.protocol != "HStore") {
+      if (context.protocol == "Sundial"){
+        tbl_new_order_vec.push_back(
+          std::make_unique<Table<997, new_order::key, new_order::value, MetaInitFuncSundial>>(
+              newOrderTableID, partitionID));
+      } else if (context.protocol != "HStore") {
         tbl_new_order_vec.push_back(
           std::make_unique<Table<997, new_order::key, new_order::value>>(
               newOrderTableID, partitionID));
       } else {
-        tbl_new_order_vec.push_back(
-          std::make_unique<HStoreTable<new_order::key, new_order::value>>(
+        if (context.lotus_checkpoint) {
+          tbl_new_order_vec.push_back(
+            std::make_unique<HStoreCOWTable<997, new_order::key, new_order::value>>(
               newOrderTableID, partitionID));
+        } else {
+          tbl_new_order_vec.push_back(
+            std::make_unique<HStoreTable<new_order::key, new_order::value>>(
+              newOrderTableID, partitionID));
+        }
       }
 
       auto orderTableID = order::tableID;
-      if (context.protocol != "HStore") {
+      if (context.protocol == "Sundial"){
+        tbl_order_vec.push_back(
+          std::make_unique<Table<997, order::key, order::value, MetaInitFuncSundial>>(
+              orderTableID, partitionID));
+      } else if (context.protocol != "HStore") {
         tbl_order_vec.push_back(
           std::make_unique<Table<997, order::key, order::value>>(
               orderTableID, partitionID));
       } else {
-        tbl_order_vec.push_back(
-          std::make_unique<HStoreTable<order::key, order::value>>(
+        if (context.lotus_checkpoint) {
+          tbl_order_vec.push_back(
+            std::make_unique<HStoreCOWTable<997, order::key, order::value>>(
               orderTableID, partitionID));
+        } else {
+          tbl_order_vec.push_back(
+            std::make_unique<HStoreTable<order::key, order::value>>(
+              orderTableID, partitionID));
+        }
       }
       auto orderLineTableID = order_line::tableID;
-      if (context.protocol != "HStore") {
+      if (context.protocol == "Sundial"){
+        tbl_order_line_vec.push_back(
+          std::make_unique<Table<997, order_line::key, order_line::value, MetaInitFuncSundial>>(
+              orderLineTableID, partitionID));
+      } else if (context.protocol != "HStore") {
         tbl_order_line_vec.push_back(
           std::make_unique<Table<997, order_line::key, order_line::value>>(
               orderLineTableID, partitionID));
       } else {
-        tbl_order_line_vec.push_back(
-          std::make_unique<HStoreTable<order_line::key, order_line::value>>(
+        if (context.lotus_checkpoint) {
+          tbl_order_line_vec.push_back(
+            std::make_unique<HStoreCOWTable<997, order_line::key, order_line::value>>(
               orderLineTableID, partitionID));
+        } else {
+          tbl_order_line_vec.push_back(
+            std::make_unique<HStoreTable<order_line::key, order_line::value>>(
+              orderLineTableID, partitionID));
+        }
       }
 
       auto stockTableID = stock::tableID;
-      if (context.protocol != "HStore") {
+      if (context.protocol == "Sundial"){
+        tbl_stock_vec.push_back(
+          std::make_unique<Table<997, stock::key, stock::value, MetaInitFuncSundial>>(stockTableID,
+                                                                 partitionID));
+      } else if (context.protocol != "HStore") {
         tbl_stock_vec.push_back(
           std::make_unique<Table<997, stock::key, stock::value>>(stockTableID,
                                                                  partitionID));
       } else {
-        tbl_stock_vec.push_back(
-          std::make_unique<HStoreTable<stock::key, stock::value>>(stockTableID,
+        if (context.lotus_checkpoint) {
+          tbl_stock_vec.push_back(
+            std::make_unique<HStoreCOWTable<997, stock::key, stock::value>>(stockTableID,
                                                                  partitionID));
+        } else {
+          tbl_stock_vec.push_back(
+            std::make_unique<HStoreTable<stock::key, stock::value>>(stockTableID,
+                                                                 partitionID));
+        }
       }
     }
     auto itemTableID = item::tableID;
-    if (context.protocol != "HStore") {
+    if (context.protocol == "Sundial"){
+      tbl_item_vec.push_back(
+        std::make_unique<Table<997, item::key, item::value, MetaInitFuncSundial>>(itemTableID, 0));
+    } else if (context.protocol != "HStore") {
       tbl_item_vec.push_back(
         std::make_unique<Table<997, item::key, item::value>>(itemTableID, 0));
     } else {
-      tbl_item_vec.push_back(
-        std::make_unique<HStoreTable<item::key, item::value>>(itemTableID, 0));
+      if (context.lotus_checkpoint) {
+        tbl_item_vec.push_back(
+          std::make_unique<HStoreCOWTable<997, item::key, item::value>>(itemTableID, 0));
+      } else {
+        tbl_item_vec.push_back(
+          std::make_unique<HStoreTable<item::key, item::value>>(itemTableID, 0));
+      }
     }
 
     // there are 10 tables in tpcc
@@ -413,6 +508,67 @@ public:
     }
   }
 
+
+  void start_checkpoint_process(const std::vector<int> & partitions) {
+    static thread_local std::vector<char> checkpoint_buffer;
+    checkpoint_buffer.reserve(8 * 1024 * 1024);
+    const std::size_t write_buffer_threshold = 128 * 1024;
+    for (auto partitionID: partitions) {
+      for (std::size_t i = 0; i < tbl_vecs.size(); ++i) {
+        if (i == 3 || i == 8) continue; // No need to checkpoint readonly customer_name_idx / item_table
+        ITable *table = find_table(i, partitionID);
+        table->turn_on_cow();
+        threadpools[partitionID % 6]->enqueue([this,write_buffer_threshold, table]() {
+          table->dump_copy([&, this, table](const void * k, const void * v){
+            std::size_t size_needed = table->key_size();
+            auto write_idx = checkpoint_buffer.size();
+            checkpoint_buffer.resize(size_needed + checkpoint_buffer.size());
+            memcpy(&checkpoint_buffer[write_idx], (const char*)k, table->key_size());
+
+            size_needed = table->value_size();
+            write_idx = checkpoint_buffer.size();
+            checkpoint_buffer.resize(size_needed + checkpoint_buffer.size());
+            memcpy(&checkpoint_buffer[write_idx], (const char*)v, table->value_size());
+          }, [&, this, write_buffer_threshold, table]() { // Called when the table is unlocked
+            if (checkpoint_buffer.size() >= write_buffer_threshold) {
+              this->checkpoint_file_writer->write(&checkpoint_buffer[0], checkpoint_buffer.size(), false);
+              checkpoint_buffer.clear();
+            }
+            //checkpoint_buffer.clear();
+          });
+      });
+      }
+    }
+  }
+
+  bool checkpoint_work_finished(const std::vector<int> & partitions) {
+    for (auto partitionID: partitions) {
+      for (std::size_t i = 0; i < tbl_vecs.size(); ++i) {
+        if (i == 3 || i == 8) continue; // No need to checkpoint readonly customer_name_idx / item_table
+        ITable *table = find_table(i, partitionID);
+        if (table->cow_dump_finished() == false)
+          return false;
+      }
+    }
+    return true;
+  }
+
+  void stop_checkpoint_process(const std::vector<int> & partitions) {
+    for (auto partitionID: partitions) {
+      for (std::size_t i = 0; i < tbl_vecs.size(); ++i) {
+        if (i == 3 || i == 8) continue; // No need to checkpoint readonly customer_name_idx / item_table
+        ITable *table = find_table(i, partitionID);
+        auto cleanup_work = table->turn_off_cow();
+        threadpools[partitionID % 6]->enqueue(cleanup_work);
+      }
+    }
+  }
+
+  ~Database() {
+    for (size_t i = 0; i < threadpools.size(); ++i) {
+      delete threadpools[i];
+    }
+  }
 private:
   void warehouseInit(std::size_t partitionID) {
 
@@ -808,6 +964,8 @@ private:
   }
 
 private:
+  std::vector<ThreadPool*> threadpools;
+  WALLogger * checkpoint_file_writer = nullptr;
   std::vector<std::vector<ITable *>> tbl_vecs;
 
   std::vector<std::unique_ptr<ITable>> tbl_warehouse_vec;

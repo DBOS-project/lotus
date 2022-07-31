@@ -214,12 +214,12 @@ public:
     *reinterpret_cast<uint32_t *>(&data[0] + sizeof(header_type) + sizeof(deadbeef_type)) = id;
   }
 
-  int64_t get_transaction_id() const {
-    return *reinterpret_cast<const int64_t *>(&data[0] + sizeof(header_type) + sizeof(deadbeef_type) + sizeof(source_cluster_worker_id_type));
+  uint64_t get_transaction_id() const {
+    return *reinterpret_cast<const uint64_t *>(&data[0] + sizeof(header_type) + sizeof(deadbeef_type) + sizeof(source_cluster_worker_id_type));
   }
 
-  void set_transaction_id(int64_t tid) {
-    *reinterpret_cast<int64_t *>(&data[0] + sizeof(header_type) + sizeof(deadbeef_type) + sizeof(source_cluster_worker_id_type)) = tid;
+  void set_transaction_id(uint64_t tid) {
+    *reinterpret_cast<uint64_t *>(&data[0] + sizeof(header_type) + sizeof(deadbeef_type) + sizeof(source_cluster_worker_id_type)) = tid;
   }
 
   size_t size_as_of_transaction_id() const {

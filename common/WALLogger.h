@@ -150,6 +150,26 @@ public:
   std::size_t emulated_persist_latency;
 };
 
+class BlackholeLogger : public WALLogger {
+public:
+  BlackholeLogger(const std::string & filename, std::size_t emulated_persist_latency = 0, std::size_t block_size = 4096) 
+    : WALLogger(filename, emulated_persist_latency), writer(filename.c_str(), 
+    block_size, emulated_persist_latency){}
+  ~BlackholeLogger() override {}
+
+  size_t write(const char *str, long size, bool persist, std::function<void()> on_blocking = [](){}) override {
+    return 0;
+  }
+  void sync(size_t lsn, std::function<void()> on_blocking = [](){}) {
+    return;
+  }
+
+  void close() {
+    writer.close();
+  }
+
+  BufferedDirectFileWriter writer;
+};
 
 class GroupCommitLogger : public WALLogger {
 public:
@@ -213,7 +233,7 @@ public:
     waiting_syncs.fetch_add(1);
     while (sync_lsn.load() < lsn) {
       on_blocking();
-      std::this_thread::sleep_for(std::chrono::microseconds(10));
+      //std::this_thread::sleep_for(std::chrono::microseconds(10));
     }
   }
 

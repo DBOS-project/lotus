@@ -103,7 +103,6 @@ public:
   bool isUniform = true;
 
   PartitionStrategy strategy = PartitionStrategy::ROUND_ROBIN;
-  std::size_t granules_per_partition = 1;
 };
 bool Context::tested = false;
 } // namespace ycsb

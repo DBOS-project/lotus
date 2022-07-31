@@ -30,7 +30,7 @@ public:
 
   struct TransactionLockRequest {
     int source_coordinator;
-    int64_t tid;
+    uint64_t tid;
     std::vector<uint32_t> table_ids;
     std::vector<uint32_t> partition_ids;
     std::vector<bool> read_writes;
@@ -145,6 +145,10 @@ public:
   virtual size_t get_stall_time() {
     return stall_time_us;
   }
+
+  virtual void deserialize_lock_status(Decoder & dec) {}
+
+  virtual void serialize_lock_status(Encoder & enc) {}
 
   virtual int32_t get_partition_count() = 0;
 
@@ -416,7 +420,7 @@ public:
   std::vector<CalvinRWKey> readSet, writeSet;
   WALLogger * logger = nullptr;
   uint64_t txn_random_seed_start = 0;
-  int64_t transaction_id = 0;
+  uint64_t transaction_id = 0;
   uint64_t straggler_wait_time = 0;
   bool async = false;
 };

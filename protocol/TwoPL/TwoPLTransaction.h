@@ -119,6 +119,10 @@ public:
     return stall_time_us;
   }
 
+  virtual void deserialize_lock_status(Decoder & dec) {}
+
+  virtual void serialize_lock_status(Encoder & enc) {}
+
   virtual int32_t get_partition_count() = 0;
 
   virtual int32_t get_partition(int i) = 0;
@@ -332,7 +336,7 @@ public:
   std::vector<TwoPLRWKey> readSet, writeSet;
   WALLogger * logger = nullptr;
   uint64_t txn_random_seed_start = 0;
-  int64_t transaction_id = 0;
+  uint64_t transaction_id = 0;
   uint64_t straggler_wait_time = 0;
 };
 } // namespace star

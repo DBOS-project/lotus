@@ -9,6 +9,7 @@
 #include <fstream>
 #include <glog/logging.h>
 
+#include "Random.h"
 // The nearest-rank method
 // https://en.wikipedia.org/wiki/Percentile
 
@@ -16,9 +17,10 @@ namespace star {
 extern bool warmed_up;
 template <class T> class Percentile {
 public:
+  Percentile() : rand((uint64_t)this){}
   using element_type = T;
   void add(const element_type &value) {
-    if (warmed_up == false)
+    if (warmed_up == false || rand.uniform_dist(0, 100) > 10) // record 2% of the data
       return;
     isSorted_ = false;
     data_.push_back(value);
@@ -94,6 +96,7 @@ private:
   }
 
 private:
+  Random rand;
   bool isSorted_ = true;
   std::vector<element_type> data_;
   element_type sum = 0;

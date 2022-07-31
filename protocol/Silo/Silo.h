@@ -275,7 +275,7 @@ private:
       }
 
       for (auto i = 0u; i < writeSet.size(); ++i) {
-        auto &writeKey = readSet[i];
+        auto &writeKey = writeSet[i];
         auto partitionId = writeKey.get_partition_id();
         auto coordinatorId = partitioner.master_coordinator(partitionId);
         writeSetGroupByCoordinator[coordinatorId].push_back(writeKey);
@@ -330,6 +330,8 @@ private:
           }
 
         } else {
+          if (readSet.empty() && writeSet.empty())
+            continue;
           txn.pendingResponses++;
           auto coordinatorID = i;
           messages[coordinatorID]->set_transaction_id(txn.transaction_id);

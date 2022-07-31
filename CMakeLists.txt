@@ -1,9 +1,9 @@
 cmake_minimum_required(VERSION 3.2)
 project(star)
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread -Wall -Wno-long-long -Wno-unused-variable -fno-omit-frame-pointer -Wno-variadic-macros -pedantic -O2 -DNDEBUG -g3")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread -Wall -Wno-long-long -Wno-unused-variable -fno-omit-frame-pointer -Wno-variadic-macros -pedantic  -O3 -DNDEBUG -g3")
 set(CMAKE_CXX_STANDARD 14)
-# 
+# -O3 -DNDEBUG
 find_library(jemalloc_lib jemalloc) # jemalloc 5.0
 
 # additional target to perform clang-format run, requires clang-format

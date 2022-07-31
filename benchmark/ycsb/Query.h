@@ -82,7 +82,8 @@ public:
               0, static_cast<int>(context.keysPerGranule) - 1) : random.uniform_dist(
               0, static_cast<int>(context.keysPerPartition) - 1);
         } else {
-          key = Zipf::globalZipf().value(random.next_double());
+          key = i == 0 ? random.uniform_dist(
+              0, static_cast<int>(context.keysPerGranule) - 1) : Zipf::globalZipf().value(random.next_double());
         }
         int this_partition_idx = 0;
         if (crossPartition <= context.crossPartitionProbability &&
@@ -140,6 +141,57 @@ public:
     }
     return query;
   }
+
+  // YCSBQuery<N> operator()(const Context &context, uint32_t partitionID, uint32_t granuleID,
+  //                         Random &random, const Partitioner & partitioner) const {
+  //   YCSBQuery<N> query;
+  //   int readOnly = random.uniform_dist(1, 100);
+  //   int crossPartition = random.uniform_dist(1, 100);
+
+  //   for (auto i = 0u; i < N; i++) {
+  //     // read or write
+
+  //     if (readOnly <= context.readOnlyTransaction) {
+  //       query.UPDATE[i] = false;
+  //     } else {
+  //       int readOrWrite = random.uniform_dist(1, 100);
+  //       if (readOrWrite <= context.readWriteRatio) {
+  //         query.UPDATE[i] = false;
+  //       } else {
+  //         query.UPDATE[i] = true;
+  //       }
+  //     }
+
+  //     int32_t key;
+
+  //     // generate a key in a partition
+  //     bool retry;
+  //     do {
+  //       retry = false;
+
+  //       key = Zipf::globalZipf().value(random.next_double());
+  //       query.Y_KEY[i] = key;
+  //       // if (crossPartition <= context.crossPartitionProbability &&
+  //       //     context.partition_num > 1) {
+  //       //   auto newPartitionID = partitionID;
+  //       //   while (newPartitionID == partitionID) {
+  //       //     newPartitionID = random.uniform_dist(0, context.partition_num - 1);
+  //       //   }
+  //       //   query.Y_KEY[i] = context.getGlobalKeyID(key, newPartitionID);
+  //       // } else {
+  //       //   query.Y_KEY[i] = context.getGlobalKeyID(key, partitionID);
+  //       // }
+
+  //       for (auto k = 0u; k < i; k++) {
+  //         if (query.Y_KEY[k] == query.Y_KEY[i]) {
+  //           retry = true;
+  //           break;
+  //         }
+  //       }
+  //     } while (retry);
+  //   }
+  //   return query;
+  // }
 };
 } // namespace ycsb
 } // namespace star

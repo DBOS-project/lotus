@@ -47,6 +47,23 @@ int main(int argc, char *argv[]) {
   context.newOrderCrossPartitionProbability = FLAGS_neworder_dist;
   context.paymentCrossPartitionProbability = FLAGS_payment_dist;
 
+  if (context.log_path != "" && context.wal_group_commit_time != 0) {
+    std::string redo_filename =
+          context.log_path + "_group_commit.txt";
+    std::string logger_type = "GroupCommit Logger";
+    if (context.lotus_checkpoint == LotusCheckpointScheme::COW_ON_CHECKPOINT_ON_LOGGING_OFF) { // logging off so that logging and checkpoint threads will not compete for bandwidth
+      logger_type = "Blackhole Logger";
+      context.logger = new star::BlackholeLogger(redo_filename, context.emulated_persist_latency);
+    } else {
+      context.logger = new star::GroupCommitLogger(redo_filename, context.group_commit_batch_size, context.wal_group_commit_time, context.emulated_persist_latency);
+    }
+    LOG(INFO) << "WAL Group Commiting to file [" << redo_filename << "]" << " using " << logger_type;
+  } else {
+    std::string redo_filename =
+          context.log_path + "_non_group_commit.txt";
+    context.logger = new star::SimpleWALLogger(redo_filename, context.emulated_persist_latency);
+    LOG(INFO) << "WAL Group Commiting off";
+  }
   star::tpcc::Database db;
   db.initialize(context);
 
