@@ -84,6 +84,3 @@ sh run_calvin_mp_ycsb.sh
 sh run_lotus_mp_ycsb.sh
 ```
 7. Results are placed under `~/exp_results` on the first node of the cluster.
-
-
-
