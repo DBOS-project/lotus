@@ -1,4 +1,4 @@
-**Xinjing Zhou**, Xiangyao Yu, Goetz Grafea, Micheal Stonebraker
+**Xinjing Zhou**, Xiangyao Yu, Goetz Graefe, Micheal Stonebraker
 
 [Lotus: Scalable Multi-Partition Transactions on Single-Threaded Partitioned Databases](https://doi.org/10.14778/3551793.3551843)
 
