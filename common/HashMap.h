@@ -68,6 +68,62 @@ public:
     _map([](std::unordered_map<KeyType, ValueType> &map) { map.clear(); });
   }
 
+
+  void iterate_non_const(std::function<void(const KeyType &, ValueType &)> processor, std::function<void()> unlock_processor) {
+    std::vector<std::size_t> bucket_counts(N);
+    std::size_t max_bucket_count = 0;
+    for (std::size_t i = 0; i < N; ++i) {
+      //locks_[i].lock();
+      std::size_t bucket_count = maps_[i].bucket_count();
+      //locks_[i].unlock();
+      bucket_counts[i] = bucket_count;
+      max_bucket_count = std::max(max_bucket_count, bucket_count);
+    }
+
+    for (std::size_t j = 0; j < max_bucket_count; ++j) {
+      for (std::size_t i = 0; i < N; ++i) {
+        if (j >= bucket_counts[i])
+          continue;
+        //locks_[i].lock();
+        auto bucket_idx = j;
+        auto bucket_end = maps_[i].end(bucket_idx);
+        for (auto it = maps_[i].begin(bucket_idx); it != bucket_end; ++it) {
+          processor(it->first, it->second);
+        }
+        //locks_[i].unlock();
+        unlock_processor();
+      }
+      unlock_processor();
+    }
+  }
+
+  void iterate(std::function<void(const KeyType &, const ValueType &)> processor, std::function<void()> unlock_processor) {
+    std::vector<std::size_t> bucket_counts(N);
+    std::size_t max_bucket_count = 0;
+    for (std::size_t i = 0; i < N; ++i) {
+      //locks_[i].lock();
+      std::size_t bucket_count = maps_[i].bucket_count();
+      //locks_[i].unlock();
+      bucket_counts[i] = bucket_count;
+      max_bucket_count = std::max(max_bucket_count, bucket_count);
+    }
+
+    for (std::size_t j = 0; j < max_bucket_count; ++j) {
+      for (std::size_t i = 0; i < N; ++i) {
+        if (j >= bucket_counts[i])
+          continue;
+        //locks_[i].lock();
+        auto bucket_idx = j;
+        auto bucket_end = maps_[i].cend(bucket_idx);
+        for (auto it = maps_[i].cbegin(bucket_idx); it != bucket_end; ++it) {
+          processor(it->first, it->second);
+        }
+        //locks_[i].unlock();
+        unlock_processor();
+      }
+      unlock_processor();
+    }
+  }
 private:
   template <class ApplyFunc>
   auto &_applyAtRef(ApplyFunc applyFunc, std::size_t i) {
@@ -125,6 +181,14 @@ public:
     }
   }
 
+  ValueType * search(const KeyType & key) {
+    auto it = map.find(key);
+    if (it == map.end()) {
+      return nullptr;
+    }
+    return &it->second;
+  }
+
   bool contains(const KeyType &key) {
     return map.find(key) != map.end();
   }
@@ -149,6 +213,9 @@ public:
     map.clear();
   }
 
+  void iterate(std::function<void(const KeyType &, const ValueType &)> processor) {
+    CHECK(false);
+  }
 private:
   std::unordered_map<KeyType, ValueType> map;
 };

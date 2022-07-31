@@ -8,6 +8,7 @@
 #include "benchmark/ycsb/Random.h"
 #include "benchmark/ycsb/Schema.h"
 #include "common/Operation.h"
+#include "common/ThreadPool.h"
 #include "core/Partitioner.h"
 #include "core/Table.h"
 #include <algorithm>
@@ -68,7 +69,12 @@ public:
   }
 
   void initialize(const Context &context) {
-
+    if (context.lotus_checkpoint) {
+      for (int i = 0; i < 6; ++i) {
+        threadpools.push_back(new ThreadPool(1));
+      }
+      checkpoint_file_writer = new SimpleWALLogger(context.lotus_checkpoint_location);
+    }
     std::size_t coordinator_id = context.coordinator_id;
     std::size_t partitionNum = context.partition_num;
     std::size_t threadsNum = context.worker_num;
@@ -78,14 +84,24 @@ public:
 
     for (auto partitionID = 0u; partitionID < partitionNum; partitionID++) {
       auto ycsbTableID = ycsb::tableID;
-      if (context.protocol != "HStore") {
+      if (context.protocol == "Sundial"){
         tbl_ycsb_vec.push_back(
-          std::make_unique<Table<9973, ycsb::key, ycsb::value>>(ycsbTableID,
+          std::make_unique<Table<997, ycsb::key, ycsb::value, MetaInitFuncSundial>>(ycsbTableID,
+                                                                partitionID));
+      } else if (context.protocol != "HStore") {
+        tbl_ycsb_vec.push_back(
+          std::make_unique<Table<997, ycsb::key, ycsb::value>>(ycsbTableID,
                                                                 partitionID));
       } else {
-        tbl_ycsb_vec.push_back(
+        if (context.lotus_checkpoint) {
+          tbl_ycsb_vec.push_back(
+          std::make_unique<HStoreCOWTable<997, ycsb::key, ycsb::value>>(ycsbTableID,
+                                                                partitionID));
+        } else {
+          tbl_ycsb_vec.push_back(
           std::make_unique<HStoreTable<ycsb::key, ycsb::value>>(ycsbTableID,
                                                                 partitionID));
+        }
       }
     }
 
@@ -109,6 +125,58 @@ public:
     CHECK(false); // not supported
   }
 
+
+  void start_checkpoint_process(const std::vector<int> & partitions) {
+    static thread_local std::vector<char> checkpoint_buffer;
+    checkpoint_buffer.reserve(8 * 1024 * 1024);
+    const std::size_t write_buffer_threshold = 128 * 1024;
+    for (auto partitionID: partitions) {
+      ITable *table = find_table(0, partitionID);
+      table->turn_on_cow();
+      threadpools[partitionID % 6]->enqueue([this,write_buffer_threshold, table]() {
+        table->dump_copy([&, this, table](const void * k, const void * v){
+          std::size_t size_needed = table->key_size();
+          auto write_idx = checkpoint_buffer.size();
+          checkpoint_buffer.resize(size_needed + checkpoint_buffer.size());
+          memcpy(&checkpoint_buffer[write_idx], (const char*)k, table->key_size());
+
+          size_needed = table->value_size();
+          write_idx = checkpoint_buffer.size();
+          checkpoint_buffer.resize(size_needed + checkpoint_buffer.size());
+          memcpy(&checkpoint_buffer[write_idx], (const char*)v, table->value_size());
+        }, [&, this, write_buffer_threshold, table]() { // Called when the table is unlocked
+          if (checkpoint_buffer.size() >= write_buffer_threshold) {
+            this->checkpoint_file_writer->write(&checkpoint_buffer[0], checkpoint_buffer.size(), false);
+            checkpoint_buffer.clear();
+          }
+          //checkpoint_buffer.clear();
+        });
+      });
+    }
+  }
+
+  bool checkpoint_work_finished(const std::vector<int> & partitions) {
+    for (auto partitionID: partitions) {
+      ITable *table = find_table(0, partitionID);
+      if (table->cow_dump_finished() == false)
+        return false;
+    }
+    return true;
+  }
+
+  void stop_checkpoint_process(const std::vector<int> & partitions) {
+    for (auto partitionID: partitions) {
+      ITable *table = find_table(0, partitionID);
+      auto cleanup_work = table->turn_off_cow();
+      threadpools[partitionID % 6]->enqueue(cleanup_work);
+    }
+  }
+
+  ~Database() {
+    for (size_t i = 0; i < threadpools.size(); ++i) {
+      delete threadpools[i];
+    }
+  }
 private:
   void ycsbInit(const Context &context, std::size_t partitionID) {
 
@@ -172,6 +240,8 @@ private:
   }
 
 private:
+  std::vector<ThreadPool*> threadpools;
+  WALLogger * checkpoint_file_writer = nullptr;
   std::vector<std::vector<ITable *>> tbl_vecs;
   std::vector<std::unique_ptr<ITable>> tbl_ycsb_vec;
 };

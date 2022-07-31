@@ -150,6 +150,13 @@ public:
 
   void *get_value() const { return value; }
 
+  void set_lock_index(std::uint32_t lock_index) {
+    this->lock_index = lock_index;
+  }
+
+  int32_t get_lock_index() {
+    return lock_index;
+  }
 private:
   /*
    * A bitvec is a 64-bit word.
@@ -170,7 +177,7 @@ private:
   void *value = nullptr;
   uint64_t bitvec = 0;
   uint64_t tid = 0;
-
+  int32_t lock_index = -1;
 public:
   static constexpr uint64_t TABLE_ID_MASK = 0x1f;
   static constexpr uint64_t TABLE_ID_OFFSET = 57;

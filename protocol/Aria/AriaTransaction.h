@@ -131,6 +131,10 @@ public:
     return stall_time_us;
   }
 
+  virtual void deserialize_lock_status(Decoder & dec) {}
+
+  virtual void serialize_lock_status(Encoder & enc) {}
+
   void reset() {
     abort_lock = false;
     abort_no_retry = false;
@@ -294,7 +298,7 @@ public:
   std::vector<AriaRWKey> readSet, writeSet;
   WALLogger * logger = nullptr;
   uint64_t txn_random_seed_start = 0;
-  int64_t transaction_id = 0;
+  uint64_t transaction_id = 0;
   std::size_t ith_replica;
   uint64_t straggler_wait_time = 0;
   bool aria_aborted = false;

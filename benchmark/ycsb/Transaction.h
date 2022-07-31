@@ -78,12 +78,13 @@ public:
     // int granules_count = 0;
     // for (int32_t i = 0; i < get_partition_count(); ++i)
     //   granules_count += get_partition_granule_count(i);
-    for (int32_t i = 0; i < get_partition_count(); ++i)
-      encoder << get_partition(i);
+    // for (int32_t i = 0; i < get_partition_count(); ++i)
+    //   encoder << get_partition(i);
     // encoder << granules_count;
     // for (int32_t i = 0; i < get_partition_count(); ++i)
     //   for (int32_t j = 0; j < get_partition_granule_count(i); ++j)
     //     encoder << get_granule(i, j);
+    Transaction::serialize_lock_status(encoder);
     return res;
   }
 

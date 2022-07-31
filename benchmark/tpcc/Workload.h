@@ -29,11 +29,11 @@ public:
       : coordinator_id(coordinator_id), db(db), random(random),
         partitioner(partitioner) {}
 
-  static int64_t next_transaction_id(uint64_t coordinator_id) {
-    constexpr int coordinator_id_offset = 56;
+  static uint64_t next_transaction_id(uint64_t coordinator_id) {
+    constexpr int coordinator_id_offset = 32;
     static std::atomic<int64_t> tid_static{1};
     auto tid = tid_static.fetch_add(1);
-    return ((int64_t)coordinator_id << coordinator_id_offset) | tid;
+    return (coordinator_id << coordinator_id_offset) | tid;
   }
 
   std::unique_ptr<TransactionType> next_transaction(ContextType &context,
@@ -97,6 +97,7 @@ public:
       p->txn_random_seed_start = seed;
       p->transaction_id = transaction_id;
       p->straggler_wait_time = straggler_wait_time;
+      p->deserialize_lock_status(decoder);
       return p;
     } else {
       auto p = std::make_unique<Payment<Transaction>>(coordinator_id, partition_id,
@@ -105,6 +106,7 @@ public:
       p->txn_random_seed_start = seed;
       p->transaction_id = transaction_id;
       p->straggler_wait_time = straggler_wait_time;
+      p->deserialize_lock_status(decoder);
       return p;
     }
   }

@@ -3,11 +3,13 @@
 #include "core/Macros.h"
 #include "common/WALLogger.h"
 
+DEFINE_bool(lotus_sp_parallel_exec_commit, false, "parallel execution and commit for Lotus");
 DEFINE_int32(read_write_ratio, 80, "read write ratio");
 DEFINE_int32(read_only_ratio, 0, "read only transaction ratio");
 DEFINE_int32(cross_ratio, 0, "cross partition transaction ratio");
 DEFINE_int32(keys, 200000, "keys in a partition.");
 DEFINE_double(zipf, 0, "skew factor");
+DEFINE_int32(cross_part_num, 2, "Cross-partition partion #");
 
 DEFINE_int32(nop_prob, 0, "prob of transactions having nop, out of 10000");
 DEFINE_int64(n_nop, 0, "total number of nop");
@@ -30,19 +32,24 @@ int main(int argc, char *argv[]) {
   context.readOnlyTransaction = FLAGS_read_only_ratio;
   context.crossPartitionProbability = FLAGS_cross_ratio;
   context.keysPerPartition = FLAGS_keys;
-
+  context.lotus_sp_parallel_exec_commit = FLAGS_lotus_sp_parallel_exec_commit;
+  context.crossPartitionPartNum = FLAGS_cross_part_num;
   context.nop_prob = FLAGS_nop_prob;
   context.n_nop = FLAGS_n_nop;
 
   context.granules_per_partition = FLAGS_granule_count;
   context.keysPerGranule = context.keysPerPartition / context.granules_per_partition;
 
+  LOG(INFO) << "checkpoint " << context.lotus_checkpoint << " to " << context.lotus_checkpoint_location;
+  LOG(INFO) << "cross_part_num " << FLAGS_cross_part_num;
+  LOG(INFO) << "lotus_sp_parallel_exec_commit " << FLAGS_lotus_sp_parallel_exec_commit;
   LOG(INFO) << "granules_per_partition " << context.granules_per_partition;
   LOG(INFO) << "keysPerGranule " << context.keysPerGranule;
+
   star::ycsb::Context::unit_testing(&context);
   if (FLAGS_zipf > 0) {
     context.isUniform = false;
-    star::Zipf::globalZipf().init(context.keysPerPartition, FLAGS_zipf);
+    star::Zipf::globalZipf().init(context.keysPerPartition * context.partition_num, FLAGS_zipf);
   }
 
   if (FLAGS_stragglers_zipf_factor > 0) {
@@ -52,8 +59,14 @@ int main(int argc, char *argv[]) {
   if (context.log_path != "" && context.wal_group_commit_time != 0) {
     std::string redo_filename =
           context.log_path + "_group_commit.txt";
-    context.logger = new star::GroupCommitLogger(redo_filename, context.group_commit_batch_size, context.wal_group_commit_time, context.emulated_persist_latency);
-    LOG(INFO) << "WAL Group Commiting on[" << redo_filename << "]";
+    std::string logger_type = "GroupCommit Logger";
+    if (context.lotus_checkpoint == LotusCheckpointScheme::COW_ON_CHECKPOINT_ON_LOGGING_OFF) { // logging off so that logging and checkpoint threads will not compete for bandwidth
+      logger_type = "Blackhole Logger";
+      context.logger = new star::BlackholeLogger(redo_filename, context.emulated_persist_latency);
+    } else {
+      context.logger = new star::GroupCommitLogger(redo_filename, context.group_commit_batch_size, context.wal_group_commit_time, context.emulated_persist_latency);
+    }
+    LOG(INFO) << "WAL Group Commiting to file [" << redo_filename << "]" << " using " << logger_type;
   } else {
     std::string redo_filename =
           context.log_path + "_non_group_commit.txt";
